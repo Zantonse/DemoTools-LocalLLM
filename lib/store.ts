@@ -25,6 +25,8 @@ export interface Session {
   messages: ChatMessage[];
   transcript: { role: "user" | "assistant"; text: string }[];
   events: InspectorEvent[];
+  /** Links an external MCP agent (e.g. Hermes) to this signed-in session. */
+  mcp?: { key: string; client?: string };
   /** Exchanged API tokens, keyed by scope, reused until they expire. */
   tokenCache: Record<string, { token: string; exp: number }>;
 }
@@ -39,12 +41,15 @@ export interface DemoSettings {
 
 interface Store {
   sessions: Map<string, Session>;
+  /** MCP connection key → session id. */
+  mcpKeys: Map<string, string>;
   settings: DemoSettings;
 }
 
 const g = globalThis as typeof globalThis & { __o4aaStore?: Store };
 export const store: Store = (g.__o4aaStore ??= {
   sessions: new Map(),
+  mcpKeys: new Map(),
   settings: { legacyMode: false, approvalThreshold: config.defaultApprovalThreshold, engine: config.agent.engine },
 });
 
@@ -78,6 +83,8 @@ export function resetConversation(session: Session) {
 }
 
 export function clearAuth(session: Session) {
+  if (session.mcp) store.mcpKeys.delete(session.mcp.key);
+  delete session.mcp;
   delete session.user;
   delete session.idToken;
   delete session.accessToken;

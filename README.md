@@ -70,6 +70,29 @@ Open `http://mac-mini.local:3000` on the laptop and `http://mac-mini.local:3000/
 
 To keep the Mac awake during a demo: `caffeinate -dims`.
 
+## Bring your own agent: Hermes (or any MCP client)
+
+The demo app is also an **MCP server** (`/api/mcp`, Streamable HTTP) exposing the same billing tools. Connect an off-the-shelf agent such as [Hermes Agent](https://github.com/NousResearch/hermes-agent), and Okta governs it exactly like the built-in one: a scoped, user-bound token per call, and phone approval for big refunds.
+
+1. Sign in to the demo app and click **🔌 Connect agent**.
+2. Copy the config into `~/.hermes/config.yaml` and restart Hermes:
+
+   ```yaml
+   mcp_servers:
+     acme_billing:
+       url: "http://localhost:3000/api/mcp"
+       headers:
+         Authorization: "Bearer mcp_demo_…"   # from the Connect agent panel
+       timeout: 300                           # Hermes defaults to 120s; leave time for the phone approval
+   ```
+
+3. Ask Hermes: *"Use acme_billing to show Initech's orders"*, then *"…refund $4,800 on ORD-2001 for a contract dispute"*. Hermes sees the tools as `mcp_acme_billing_*`. The inspector updates live, and the approval shows up on your phone.
+
+Notes:
+- The key only links the MCP client to your signed-in demo session (a stand-in for MCP's OAuth sign-in). It carries no permissions. Every billing call still needs an Okta token, and **New key** in the panel revokes the old one.
+- If Hermes and the demo both use Ollama, point `LOCAL_LLM_MODEL` at the same Qwen model Hermes uses so only one copy is loaded in memory. Or switch the demo's own agent to **Scripted** while Hermes is the star.
+- Tested with the official MCP Python SDK (the client library Hermes uses), including a 50-second approval wait. Not yet tested with Hermes itself.
+
 ## Live mode against your Okta org
 
 Set `DEMO_MODE=okta` and fill in the Okta section of `.env.local`. **[docs/OKTA_SETUP.md](docs/OKTA_SETUP.md)** walks through the authorization server, scopes, apps, access policies and Okta Verify setup. Everything is discovered from the authorization server's `/.well-known/openid-configuration`, and all calls are standard OAuth/OIDC:
@@ -106,6 +129,7 @@ See **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)** for a 10-minute talk track wi
 | `lib/idp/okta.ts` | Real Okta adapter (discovery-based OAuth/OIDC) |
 | `lib/idp/mock.ts` | Offline Okta simulator with personas and a CIBA queue |
 | `app/api/billing/` + `lib/billing/` | The protected demo API and its token checks |
+| `lib/mcp.ts`, `app/api/mcp/` | MCP server for external agents (Hermes, Claude Desktop, Cursor…) |
 
 ## Demo controls
 

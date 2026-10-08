@@ -51,6 +51,8 @@ const TOOL_DEFS = [
   },
 ];
 
+export const TOOL_INFO = TOOL_DEFS;
+
 export const TOOLS: ToolSpec[] = TOOL_DEFS.map(({ name, description, parameters }) => ({
   type: "function",
   function: { name, description, parameters },
@@ -179,6 +181,24 @@ async function requestApproval(ctx: AgentContext, scope: string, bindingMessage:
   }
   emit({ kind: "error", title: "Approval timed out", tags: ["ciba"] });
   return { denied: "The approval request timed out." };
+}
+
+/** Checks and coerces tool arguments; small models often send "$4,800" or omit fields. */
+export function parseArgs(name: string, raw: string): { ok: true; args: Record<string, unknown> } | { ok: false; error: string } {
+  let args: Record<string, unknown>;
+  try {
+    args = raw.trim() ? (JSON.parse(raw) as Record<string, unknown>) : {};
+  } catch {
+    return { ok: false, error: `Arguments for ${name} were not valid JSON. Send a JSON object.` };
+  }
+  if (name === "get_account_orders" && !args.account_id) return { ok: false, error: "account_id is required, e.g. ACC-200." };
+  if (name === "issue_refund") {
+    const amount = Number(String(args.amount ?? "").replace(/[$,\s]/g, ""));
+    if (!args.order_id) return { ok: false, error: "order_id is required, e.g. ORD-2001." };
+    if (!(amount > 0)) return { ok: false, error: "amount must be a positive number, e.g. 4800." };
+    args = { ...args, amount, reason: args.reason || "Customer request" };
+  }
+  return { ok: true, args };
 }
 
 type ToolInput = Record<string, unknown>;

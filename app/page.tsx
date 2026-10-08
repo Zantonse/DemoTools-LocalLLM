@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ConnectAgent } from "@/components/ConnectAgent";
 import { Inspector } from "@/components/Inspector";
 import type { InspectorEvent } from "@/lib/inspector";
 
@@ -37,7 +38,33 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showConnect, setShowConnect] = useState(false);
+  const [mcpClient, setMcpClient] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const signedIn = Boolean(info?.user);
+  const lastTs = events.length ? events[events.length - 1].ts : 0;
+
+  // Follow activity from external MCP agents (and anything else recorded server-side).
+  useEffect(() => {
+    if (!signedIn) return;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/events?after=${lastTs}`, { cache: "no-store" });
+        const data = (await res.json()) as { events: InspectorEvent[]; mcpClient: string | null };
+        setMcpClient(data.mcpClient);
+        if (data.events.length) {
+          setEvents((prev) => {
+            const seen = new Set(prev.map((e) => e.id));
+            const fresh = data.events.filter((e) => !seen.has(e.id));
+            return fresh.length ? [...prev, ...fresh] : prev;
+          });
+        }
+      } catch {
+        // keep polling
+      }
+    }, 2000);
+    return () => clearInterval(t);
+  }, [signedIn, lastTs]);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/session", { cache: "no-store" });
@@ -92,7 +119,7 @@ export default function Home() {
         for (const line of lines) {
           if (!line.trim()) continue;
           const msg = JSON.parse(line);
-          if (msg.type === "event") setEvents((e) => [...e, msg.event]);
+          if (msg.type === "event") setEvents((e) => (e.some((x) => x.id === msg.event.id) ? e : [...e, msg.event]));
           else if (msg.type === "assistant") setTranscript((t) => [...t, { role: "assistant", text: msg.text }]);
           else if (msg.type === "error") setError(msg.message);
         }
@@ -171,6 +198,9 @@ export default function Home() {
               📱 Approver
             </a>
           )}
+          <button className="btn" onClick={() => setShowConnect(true)} title="Connect an external agent such as Hermes over MCP">
+            🔌 {mcpClient ? mcpClient.split(" ")[0] : "Connect agent"}
+          </button>
           <button className="btn" onClick={resetDemo}>
             Reset demo
           </button>
@@ -228,6 +258,7 @@ export default function Home() {
 
         <Inspector events={events.filter((e) => e.ts > clearedAt)} onClear={() => setClearedAt(Date.now())} />
       </main>
+      {showConnect && <ConnectAgent client={mcpClient} onClose={() => setShowConnect(false)} />}
     </div>
   );
 }

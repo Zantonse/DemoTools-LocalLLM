@@ -1,7 +1,7 @@
 import { config } from "../config";
 import { store } from "../store";
 import { chat, type ChatMessage } from "./llm";
-import { runTool, TOOLS, type AgentContext } from "./tools";
+import { parseArgs, runTool, TOOLS, type AgentContext } from "./tools";
 
 export type SayFn = (text: string) => void;
 
@@ -19,24 +19,6 @@ function systemPrompt(ctx: AgentContext) {
     `- Refunds above ${store.settings.approvalThreshold} USD need the user's approval on their phone. issue_refund asks for it and waits. If it reports the approval was denied, tell the user and do not call it again.`,
     "- Keep replies short: two to four sentences or a compact list. Format amounts as USD.",
   ].join("\n");
-}
-
-/** Checks and coerces tool arguments; small models often send "$4,800" or omit fields. */
-function parseArgs(name: string, raw: string): { ok: true; args: Record<string, unknown> } | { ok: false; error: string } {
-  let args: Record<string, unknown>;
-  try {
-    args = raw.trim() ? (JSON.parse(raw) as Record<string, unknown>) : {};
-  } catch {
-    return { ok: false, error: `Arguments for ${name} were not valid JSON. Send a JSON object.` };
-  }
-  if (name === "get_account_orders" && !args.account_id) return { ok: false, error: "account_id is required, e.g. ACC-200." };
-  if (name === "issue_refund") {
-    const amount = Number(String(args.amount ?? "").replace(/[$,\s]/g, ""));
-    if (!args.order_id) return { ok: false, error: "order_id is required, e.g. ORD-2001." };
-    if (!(amount > 0)) return { ok: false, error: "amount must be a positive number, e.g. 4800." };
-    args = { ...args, amount, reason: args.reason || "Customer request" };
-  }
-  return { ok: true, args };
 }
 
 async function runLocal(ctx: AgentContext, say: SayFn) {

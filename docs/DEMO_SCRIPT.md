@@ -67,6 +67,16 @@ Toggle it back off.
 
 If live mode: flip to the Okta admin console and show the authorization server **access policy rules** (token exchange gets `billing:read` and `refunds:write`; only CIBA gets `refunds:high_value`) and the **System Log** entries for the agent client.
 
+## Bring your own agent: Hermes (optional, 2 min)
+
+Setup beforehand: Hermes connected via **🔌 Connect agent** (see README). Have its chat (terminal, Telegram, etc.) on screen next to the inspector.
+
+> "Your employees won't only use agents you build. Here's Hermes, an open-source agent running a local model on this box. I plugged it into the billing system over MCP, the standard way agents connect to tools."
+
+Ask Hermes to refund $4,800 on ORD-2001. The inspector shows **External agent connected over MCP**, then **Hermes called issue_refund**, then the same token exchange, approval push and approval-bound token.
+
+> "Different agent, same rules. Okta doesn't need to trust the agent. It gives it narrow, user-bound tokens and puts the human in the loop for anything risky."
+
 ## The local-model angle (optional, 30 seconds)
 
 Point at the model badge in the top bar.
